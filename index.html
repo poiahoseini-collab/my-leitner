@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>جعبه لایتنر هوشمند زبان</title>
+  
+  <!-- فونت و آیکون‌ها -->
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- کتابخانه خواندن و ساخت فایل‌های اکسل (XLSX) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --border: #e2e8f0;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Vazirmatn', sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 60px; }
+
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 15px 20px; position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
+    .logo { font-weight: 800; font-size: 1.2rem; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+    
+    nav { display: flex; gap: 10px; background: #f1f5f9; padding: 4px; border-radius: 12px; }
+    nav button { border: none; background: transparent; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: 0.2s; }
+    nav button.active { background: var(--surface); color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+    .container { max-width: 750px; margin: 20px auto; padding: 0 15px; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 16px; border-radius: var(--radius); text-align: center; }
+    .stat-card i { font-size: 1.5rem; color: var(--primary); margin-bottom: 8px; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 800; }
+    .stat-card .label { font-size: 0.8rem; color: var(--text-muted); }
+
+    .progress-box { background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: var(--radius); margin-bottom: 20px; }
+    .progress-bar-bg { background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 8px; }
+    .progress-bar-fill { background: var(--primary); height: 100%; width: 0%; transition: width 0.3s; }
+
+    /* کارت فلش کارت ۳ بعدی */
+    .flashcard-container { perspective: 1000px; margin: 20px 0; height: 330px; }
+    .flashcard { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.6s; cursor: pointer; border-radius: var(--radius); box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    .flashcard.flipped { transform: rotateY(180deg); }
+    .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; }
+    .card-back { transform: rotateY(180deg); background: #f8fafc; border-color: var(--primary); }
+    
+    .unit-tag { background: #e0e7ff; color: var(--primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; margin-bottom: 10px; }
+    .word-title { font-size: 2.2rem; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+    .pronunciation { font-size: 1.05rem; color: var(--primary); font-family: monospace; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .example-sentence { font-style: italic; color: #475569; font-size: 0.95rem; background: #f1f5f9; padding: 8px 14px; border-radius: 8px; max-width: 90%; margin-top: 5px; }
+    .meaning { font-size: 1.6rem; font-weight: 700; color: #1e293b; }
+    .audio-btn { background: #e0e7ff; color: var(--primary); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+    .action-btns { display: flex; gap: 12px; }
+    .btn { flex: 1; padding: 14px; border: none; border-radius: 12px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-wrong { background: #fee2e2; color: var(--danger); }
+    .btn-wrong:hover { background: #fca5a5; }
+    .btn-correct { background: #d1fae5; color: var(--success); }
+    .btn-correct:hover { background: #6ee7b7; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-outline-success { background: transparent; border: 2px solid var(--success); color: var(--success); }
+    .btn-outline-success:hover { background: #d1fae5; }
+
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; color: var(--text-muted); }
+    .form-control { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; }
+    .excel-upload-box { border: 2px dashed var(--primary); background: #f0f3ff; padding: 25px; border-radius: var(--radius); text-align: center; cursor: pointer; margin-top: 15px; }
+
+    .word-table-container { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; text-align: right; font-size: 0.88rem; }
+    th, td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    th { background: #f8fafc; font-weight: 700; color: var(--text-muted); }
+    
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; }
+    .badge-easy { background: #d1fae5; color: #065f46; }
+    .badge-medium { background: #fef3c7; color: #92400e; }
+    .badge-hard { background: #fee2e2; color: #991b1b; }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+    .empty-state i { font-size: 3rem; margin-bottom: 12px; color: var(--border); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <i class="fa-solid fa-box-archive"></i>
+      <span>لایتنر هوشمند</span>
+    </div>
+    <nav>
+      <button class="active" onclick="switchTab('dashboard')"><i class="fa-solid fa-chart-pie"></i> گزارش</button>
+      <button onclick="switchTab('review')"><i class="fa-solid fa-layer-group"></i> مرور</button>
+      <button onclick="switchTab('add')"><i class="fa-solid fa-plus"></i> افزودن</button>
+    </nav>
+  </header>
+
+  <div class="container">
+
+    <!-- ۱. صفحه گزارش دهی -->
+    <div id="dashboard" class="tab-content active">
+      <h2 style="margin-bottom: 15px;">گزارش وضعیت یادگیری</h2>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <i class="fa-solid fa-fire" style="color: #f97316;"></i>
+          <div class="value" id="stat-streak">0</div>
+          <div class="label">روز متوالی (Streak)</div>
+        </div>
+        <div class="stat-card">
+          <i class="fa-solid fa-calendar-check"></i>
+          <div class="value" id="stat-today-done">0 / 140</div>
+          <div class="label">سهمیه جدید امروز</div>
+        </div>
+        <div class="stat-card">
+          <i class="fa-solid fa-clock"></i>
+          <div class="value" id="stat-review-due">0</div>
+          <div class="label">آماده مرور امروز</div>
+        </div>
+        <div class="stat-card">
+          <i class="fa-solid fa-graduation-cap" style="color: var(--success);"></i>
+          <div class="value" id="stat-learned">0</div>
+          <div class="label">کاملاً یادگرفته شده</div>
+        </div>
+      </div>
+
+      <div class="progress-box">
+        <div style="display: flex; justify-content: space-between; font-weight: 600; font-size: 0.9rem;">
+          <span>پیشرفت امروز (کلمات جدید)</span>
+          <span id="progress-text">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progress-bar"></div>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 25px; font-size: 1.1rem;">📊 گزارش ریز کلمات</h3>
+      <div class="word-table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Unit</th>
+              <th>کلمه</th>
+              <th>معنی</th>
+              <th>زمان یادگیری</th>
+              <th>میزان سختی</th>
+              <th>وضعیت</th>
+            </tr>
+          </thead>
+          <tbody id="word-report-list"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ۲. صفحه مرور کارت‌ها -->
+    <div id="review" class="tab-content">
+      <div id="review-area">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.85rem; color: var(--text-muted);" id="card-step-info">مرحله ۱ از ۸</span>
+          <span style="font-size: 0.85rem; color: var(--text-muted);" id="remaining-count">باقیمانده: ۰</span>
+        </div>
+
+        <div class="flashcard-container">
+          <div class="flashcard" id="card-element" onclick="flipCard()">
+            <div class="card-face card-front">
+              <span class="unit-tag" id="card-unit">Unit 1</span>
+              <div class="word-title" id="card-word">Word</div>
+              <div class="pronunciation">
+                <span id="card-pronun">/prəˌnʌn.siˈeɪ.ʃən/</span>
+                <button class="audio-btn" onclick="event.stopPropagation(); playAudio()"><i class="fa-solid fa-volume-high"></i></button>
+              </div>
+              <div class="example-sentence" id="card-example">Example sentence goes here...</div>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 15px;">(برای دیدن معنی کلیک کنید)</p>
+            </div>
+            <div class="card-face card-back">
+              <div class="meaning" id="card-meaning">معنی کلمه</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-btns">
+          <button class="btn btn-wrong" onclick="answerCard(false)"><i class="fa-solid fa-xmark"></i> بلد نبودم</button>
+          <button class="btn btn-correct" onclick="answerCard(true)"><i class="fa-solid fa-check"></i> بلد بودم</button>
+        </div>
+      </div>
+
+      <div id="no-cards" class="empty-state" style="display: none;">
+        <i class="fa-solid fa-circle-check" style="color: var(--success);"></i>
+        <h3>تمام مرورهای امروز انجام شد!</h3>
+        <p style="font-size: 0.85rem; margin-top: 5px;">فردا برای مرور کلمات بعدی مراجعه کنید.</p>
+      </div>
+    </div>
+
+    <!-- ۳. صفحه افزودن کلمات -->
+    <div id="add" class="tab-content">
+      <h2 style="margin-bottom: 15px;">افزودن کلمات جدید</h2>
+
+      <div style="background: var(--surface); padding: 20px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 20px;">
+        <h3 style="font-size: 1rem; margin-bottom: 12px;">افزودن دستی کلمه</h3>
+        <div class="form-group">
+          <label>نام / شماره Unit</label>
+          <input type="text" id="input-unit" class="form-control" placeholder="مثلاً: Unit 1 یا Lesson 3">
+        </div>
+        <div class="form-group">
+          <label>کلمه انگلیسی</label>
+          <input type="text" id="input-word" class="form-control" placeholder="مثلاً: Apple">
+        </div>
+        <div class="form-group">
+          <label>تلفظ (Pronunciation)</label>
+          <input type="text" id="input-pronun" class="form-control" placeholder="مثلاً: /ˈæp.əl/">
+        </div>
+        <div class="form-group">
+          <label>جمله مثال انگلیسی</label>
+          <input type="text" id="input-example" class="form-control" placeholder="مثلاً: She loves eating fresh red apples.">
+        </div>
+        <div class="form-group">
+          <label>معنی فارسی</label>
+          <input type="text" id="input-meaning" class="form-control" placeholder="مثلاً: سیب">
+        </div>
+        <button class="btn btn-primary" style="width: 100%;" onclick="addSingleWord()">ثبت کلمه</button>
+      </div>
+
+      <div style="background: var(--surface); padding: 20px; border-radius: var(--radius); border: 1px solid var(--border);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h3 style="font-size: 1rem;">افزودن دسته‌جمعی با فایل اکسل</h3>
+          <button class="btn btn-outline-success" style="padding: 6px 12px; font-size: 0.8rem;" onclick="downloadSampleExcel()">
+            <i class="fa-solid fa-download"></i> دانلود فایل اکسل نمونه
+          </button>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">ستون‌های اکسل: <strong>Unit</strong>، <strong>Word</strong>، <strong>Pronunciation</strong>، <strong>Example</strong>، <strong>Meaning</strong></p>
+        
+        <div class="excel-upload-box" onclick="document.getElementById('excel-file').click()">
+          <i class="fa-solid fa-file-excel" style="font-size: 2.5rem; color: #16a34a; margin-bottom: 8px;"></i>
+          <p style="font-size: 0.9rem; font-weight: 600;">برای انتخاب و آپلود فایل اکسل کلیک کنید</p>
+          <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleExcelUpload(event)">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let cards = JSON.parse(localStorage.getItem('leitner_cards_v3')) || [];
+    let userStats = JSON.parse(localStorage.getItem('leitner_stats_v3')) || {
+      streak: 0,
+      lastActiveDate: null,
+      todayAddedCount: 0,
+      lastAddedDate: null
+    };
+
+    let currentReviewCards = [];
+    let currentCardIndex = 0;
+    let isFlipped = false;
+
+    window.onload = function() {
+      checkStreak();
+      checkDailyQuota();
+      updateDashboard();
+    };
+
+    function saveData() {
+      localStorage.setItem('leitner_cards_v3', JSON.stringify(cards));
+      localStorage.setItem('leitner_stats_v3', JSON.stringify(userStats));
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+
+      if (tabId === 'dashboard') updateDashboard();
+      if (tabId === 'review') loadReviewCards();
+    }
+
+    function getTodayString() {
+      return new Date().toISOString().split('T')[0];
+    }
+
+    function checkStreak() {
+      const today = getTodayString();
+      if (!userStats.lastActiveDate) return;
+
+      const lastDate = new Date(userStats.lastActiveDate);
+      const currentDate = new Date(today);
+      const diffDays = Math.floor((currentDate - lastDate) / (1000 * 60 * 60 * 24));
+
+      if (diffDays > 1) {
+        userStats.streak = 0;
+      }
+    }
+
+    function checkDailyQuota() {
+      const today = getTodayString();
+      if (userStats.lastAddedDate !== today) {
+        userStats.todayAddedCount = 0;
+        userStats.lastAddedDate = today;
+      }
+    }
+
+    function updateDashboard() {
+      const today = getTodayString();
+      const dueCards = cards.filter(c => c.nextReview <= today && c.step <= 8);
+      const learned = cards.filter(c => c.step > 8);
+
+      document.getElementById('stat-streak').innerText = userStats.streak;
+      document.getElementById('stat-today-done').innerText = `${userStats.todayAddedCount} / 140`;
+      document.getElementById('stat-review-due').innerText = dueCards.length;
+      document.getElementById('stat-learned').innerText = learned.length;
+
+      const percent = Math.min(Math.round((userStats.todayAddedCount / 140) * 100), 100);
+      document.getElementById('progress-bar').style.width = `${percent}%`;
+      document.getElementById('progress-text').innerText = `${percent}%`;
+
+      renderWordReport();
+    }
+
+    function renderWordReport() {
+      const tbody = document.getElementById('word-report-list');
+      tbody.innerHTML = '';
+
+      if (cards.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: #94a3b8;">هنوز کلمه‌ای ثبت نشده است</td></tr>`;
+        return;
+      }
+
+      cards.forEach(card => {
+        const created = new Date(card.createdAt);
+        const now = new Date();
+        const diffDays = Math.max(1, Math.ceil((now - created) / (1000 * 60 * 60 * 24)));
+
+        let difficultyBadge = '<span class="badge badge-easy">آسان</span>';
+        if (card.wrongCount >= 3) {
+          difficultyBadge = '<span class="badge badge-hard">سخت</span>';
+        } else if (card.wrongCount >= 1) {
+          difficultyBadge = '<span class="badge badge-medium">متوسط</span>';
+        }
+
+        const statusText = card.step > 8 ? '✅ کاملاً یادگرفته شده' : `مرحله ${card.step} از ۸`;
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><span class="badge" style="background:#e0e7ff; color:#4f46e5;">${card.unit || 'General'}</span></td>
+          <td><strong>${card.word}</strong></td>
+          <td>${card.meaning}</td>
+          <td>${diffDays} روز</td>
+          <td>${difficultyBadge}</td>
+          <td>${statusText}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function addSingleWord() {
+      const unit = document.getElementById('input-unit').value.trim();
+      const word = document.getElementById('input-word').value.trim();
+      const pronun = document.getElementById('input-pronun').value.trim();
+      const example = document.getElementById('input-example').value.trim();
+      const meaning = document.getElementById('input-meaning').value.trim();
+
+      if (!word || !meaning) return alert('لطفاً حداقل کلمه و معنی را وارد کنید.');
+
+      if (userStats.todayAddedCount >= 140) {
+        alert('شما به سقف ۱۴۰ کلمه جدید امروز رسیده‌اید!');
+        return;
+      }
+
+      const today = getTodayString();
+      cards.push({
+        id: Date.now(),
+        unit: unit || 'General',
+        word,
+        pronun: pronun || `/${word.toLowerCase()}/`,
+        example: example || 'مثالی ثبت نشده است.',
+        meaning,
+        step: 1,
+        wrongCount: 0,
+        createdAt: new Date().toISOString(),
+        nextReview: today
+      });
+
+      userStats.todayAddedCount++;
+      userStats.lastAddedDate = today;
+      saveData();
+
+      document.getElementById('input-unit').value = '';
+      document.getElementById('input-word').value = '';
+      document.getElementById('input-pronun').value = '';
+      document.getElementById('input-example').value = '';
+      document.getElementById('input-meaning').value = '';
+
+      alert('کلمه با موفقیت ثبت شد!');
+      updateDashboard();
+    }
+
+    function downloadSampleExcel() {
+      const sampleData = [
+        { Unit: "Unit 1", Word: "Accomplish", Pronunciation: "/əˈkʌm.plɪʃ/", Example: "We can accomplish anything with hard work.", Meaning: "به انجام رساندن، موفق شدن" },
+        { Unit: "Unit 1", Word: "Persistent", Pronunciation: "/pəˈsɪs.tənt/", Example: "He is persistent in learning new vocabulary.", Meaning: "مداوم، سرسخت" },
+        { Unit: "Unit 2", Word: "Advantage", Pronunciation: "/ədˈvɑːn.tɪdʒ/", Example: "Living in a big city has many advantages.", Meaning: "مزیت، برتری" }
+      ];
+
+      const worksheet = XLSX.utils.json_to_sheet(sampleData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Words");
+      XLSX.writeFile(workbook, "Leitner_Sample_Words.xlsx");
+    }
+
+    function handleExcelUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+        let added = 0;
+        const today = getTodayString();
+
+        rows.forEach(row => {
+          if (userStats.todayAddedCount < 140) {
+            const unit = row.Unit || row.unit || row['یونیت'] || 'General';
+            const word = row.Word || row.word || row['کلمه'];
+            const meaning = row.Meaning || row.meaning || row['معنی'];
+            const pronun = row.Pronunciation || row.pronunciation || row['تلفظ'] || `/${word}/`;
+            const example = row.Example || row.example || row['مثال'] || 'مثالی ثبت نشده است.';
+
+            if (word && meaning) {
+              cards.push({
+                id: Date.now() + Math.random(),
+                unit: String(unit).trim(),
+                word: String(word).trim(),
+                pronun: String(pronun).trim(),
+                example: String(example).trim(),
+                meaning: String(meaning).trim(),
+                step: 1,
+                wrongCount: 0,
+                createdAt: new Date().toISOString(),
+                nextReview: today
+              });
+              userStats.todayAddedCount++;
+              added++;
+            }
+          }
+        });
+
+        saveData();
+        alert(`${added} کلمه اضافه شد.`);
+        updateDashboard();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function loadReviewCards() {
+      const today = getTodayString();
+      currentReviewCards = cards.filter(c => c.nextReview <= today && c.step <= 8);
+      currentCardIndex = 0;
+
+      if (currentReviewCards.length === 0) {
+        document.getElementById('review-area').style.display = 'none';
+        document.getElementById('no-cards').style.display = 'block';
+      } else {
+        document.getElementById('review-area').style.display = 'block';
+        document.getElementById('no-cards').style.display = 'none';
+        showCard();
+      }
+    }
+
+    function showCard() {
+      isFlipped = false;
+      document.getElementById('card-element').classList.remove('flipped');
+
+      const card = currentReviewCards[currentCardIndex];
+      document.getElementById('card-unit').innerText = card.unit || 'General';
+      document.getElementById('card-word').innerText = card.word;
+      document.getElementById('card-pronun').innerText = card.pronun;
+      document.getElementById('card-example').innerText = `"${card.example}"`;
+      document.getElementById('card-meaning').innerText = card.meaning;
+      document.getElementById('card-step-info').innerText = card.step <= 7 ? `مرحله ${card.step} (روزانه)` : `مرحله ۸ (مرور ۱۵ روز بعد)`;
+      document.getElementById('remaining-count').innerText = `باقیمانده: ${currentReviewCards.length - currentCardIndex}`;
+    }
+
+    function flipCard() {
+      isFlipped = !isFlipped;
+      document.getElementById('card-element').classList.toggle('flipped');
+    }
+
+    function playAudio() {
+      const word = document.getElementById('card-word').innerText;
+      const utterance = new SpeechSynthesisUtterance(word);
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function answerCard(isCorrect) {
+      if (currentReviewCards.length === 0) return;
+
+      const card = currentReviewCards[currentCardIndex];
+      const today = new Date();
+
+      if (isCorrect) {
+        card.step++;
+        let daysToAdd = 1;
+
+        if (card.step === 8) {
+          daysToAdd = 15;
+        }
+
+        today.setDate(today.getDate() + daysToAdd);
+        card.nextReview = today.toISOString().split('T')[0];
+      } else {
+        card.step = 1;
+        card.wrongCount = (card.wrongCount || 0) + 1;
+        today.setDate(today.getDate() + 1);
+        card.nextReview = today.toISOString().split('T')[0];
+      }
+
+      const todayStr = getTodayString();
+      if (userStats.lastActiveDate !== todayStr) {
+        userStats.streak++;
+        userStats.lastActiveDate = todayStr;
+      }
+
+      saveData();
+
+      currentCardIndex++;
+      if (currentCardIndex < currentReviewCards.length) {
+        showCard();
+      } else {
+        loadReviewCards();
+      }
+    }
+  </script>
+</body>
+</html>
