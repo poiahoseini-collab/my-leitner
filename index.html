@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" id="html-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">جعبه لایتنر هوشمند</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --accent: #10b981;
+            --danger: #ef4444;
+            --border: #334155;
+        }
+        body.light-mode {
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --border: #cbd5e1;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: Tahoma, sans-serif;
+            margin: 0;
+            padding: 0;
+            transition: background 0.3s, color 0.3s;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 25px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+        }
+        .container { max-width: 1000px; margin: 20px auto; padding: 15px; }
+        .hidden { display: none !important; }
+        button, input, select, textarea {
+            font-family: Tahoma, sans-serif;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text-color);
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: var(--primary-hover); }
+        .card-box {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .nav-buttons { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .nav-buttons button { flex: 1; padding: 10px; font-size: 13px; }
+        .badge { background: var(--primary); padding: 3px 8px; border-radius: 4px; font-size: 12px; }
+        .pos-badge { background: #3b82f6; padding: 3px 10px; border-radius: 6px; font-size: 12px; color: white; display: inline-block; margin: 5px 0; }
+
+        /* استایل ۷ مربع کوچک وضعیت مرور */
+        .history-squares-container {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .history-square {
+            width: 22px;
+            height: 22px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .history-square.correct {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .history-square.wrong {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .flashcard-scene {
+            perspective: 1000px;
+            width: 100%;
+            height: 280px;
+            cursor: pointer;
+            margin: 15px 0;
+        }
+        .flashcard {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            border-radius: 12px;
+        }
+        .flashcard.is-flipped {
+            transform: rotateY(180deg);
+        }
+        .flashcard-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: var(--bg-color);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .flashcard-face-back {
+            transform: rotateY(180deg);
+            text-align: center;
+            align-items: center;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .stat-card {
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 15px 5px;
+            text-align: center;
+        }
+        .stat-card.main-stat {
+            background: #1e293b;
+            border-color: #3b82f6;
+        }
+        .stat-number { font-size: 20px; font-weight: bold; margin-top: 5px; }
+        .stat-label { font-size: 11px; color: #94a3b8; }
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .filter-bar select { flex: 1; min-width: 130px; }
+
+        #auth-container {
+            max-width: 400px;
+            margin: 80px auto;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- بخش احراز هویت -->
+    <div id="auth-container" class="card-box">
+        <h2 id="auth-title">ورود به لایتنر هوشمند</h2>
+        <input type="email" id="auth-email" placeholder="ایمیل" style="width: 100%; box-sizing: border-box;">
+        <input type="password" id="auth-password" placeholder="رمز عبور" style="width: 100%; box-sizing: border-box;">
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button onclick="handleLogin()" id="btn-login" style="flex: 1; background: var(--primary);">ورود</button>
+            <button onclick="handleSignup()" id="btn-signup" style="flex: 1; background: var(--accent);">ثبت‌نام</button>
+        </div>
+        <p id="auth-error" style="color: var(--danger); font-size: 13px; margin-top: 10px;"></p>
+    </div>
+
+    <!-- بدنه اصلی اپلیکیشن -->
+    <div id="app-main-container" class="hidden">
+        <header>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <h2 id="app-title" style="margin:0;">لایتنر هوشمند</h2>
+                <span id="user-email-display" style="font-size: 12px; opacity: 0.7;"></span>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button onclick="toggleLanguage()" id="lang-btn" style="background: var(--accent);">EN / فارسی</button>
+                <button onclick="toggleTheme()">🌙/☀️</button>
+                <button onclick="handleLogout()" style="background: var(--danger);">خروج</button>
+            </div>
+        </header>
+
+        <div class="container">
+            <!-- بنر یادآور هوشمند -->
+            <div id="smart-reminder-banner" style="background: linear-gradient(135deg, #4f46e5, #3b82f6); color: white; padding: 12px 20px; border-radius: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: gap; gap: 10px;">
+                <div id="reminder-text">🔔 یادآور هوشمند: بررسی وضعیت کلمات...</div>
+                <button onclick="requestNotificationPermission()" style="background: rgba(255,255,255,0.2); border: 1px solid white; padding: 6px 12px; font-size: 12px; border-radius: 6px; cursor: pointer; color: white;">فعال‌سازی اعلان مرور</button>
+            </div>
+
+            <div class="nav-buttons">
+                <button onclick="switchTab('review')" id="nav-en-fa">مرور (انگلیسی به فارسی)</button>
+                <button onclick="switchTab('review-fa')" id="nav-fa-en">مرور (فارسی به انگلیسی)</button>
+                <button onclick="switchTab('synonyms')" id="nav-syn">مترادف و متضاد</button>
+                <button onclick="switchTab('game')" id="nav-game">بازی حدس کلمه</button>
+                <button onclick="switchTab('manage')" id="nav-manage">افزودن و اکسل</button>
+                <button onclick="switchTab('stats')" id="nav-stats">گزارش و آمار</button>
+            </div>
+
+            <!-- تب مرور انگلیسی به فارسی -->
+            <div id="tab-review" class="card-box">
+                <div class="filter-bar">
+                    <select id="review-filter-step" onchange="saveFilters(); currentCardIndexEn=0; renderEnFlashcard();">
+                        <option value="" id="opt-all-review-days">همه روزها</option>
+                        <option value="1">روز اول</option>
+                        <option value="2">روز دوم</option>
+                        <option value="3">روز سوم</option>
+                        <option value="4">روز چهارم</option>
+                        <option value="5">روز پنجم</option>
+                        <option value="6">روز ششم</option>
+                        <option value="7">روز هفتم</option>
+                        <option value="15">روز پانزدهم</option>
+                        <option value="30">روز سی‌ام</option>
+                    </select>
+                    <select id="review-filter-status" onchange="saveFilters(); currentCardIndexEn=0; renderEnFlashcard();">
+                        <option value="" id="opt-all-status">همه وضعیت‌ها</option>
+                        <option value="pending" id="opt-status-pending">مرور نشده‌های امروز</option>
+                        <option value="done" id="opt-status-done">مرورشده‌های امروز</option>
+                    </select>
+                    <select id="review-filter-unit" onchange="saveFilters(); currentCardIndexEn=0; renderEnFlashcard();">
+                        <option value="" id="opt-all-review-units">همه یونیت‌ها</option>
+                    </select>
+                    <select id="review-filter-pos" onchange="saveFilters(); currentCardIndexEn=0; renderEnFlashcard();">
+                        <option value="" id="opt-all-review-pos">همه نوع کلمات</option>
+                    </select>
+                </div>
+                <div id="flashcard-container"><p>در حال بارگذاری...</p></div>
+            </div>
+
+            <!-- تب مرور فارسی به انگلیسی -->
+            <div id="tab-review-fa" class="card-box hidden">
+                <div class="filter-bar">
+                    <select id="review-fa-filter-step" onchange="saveFilters(); currentCardIndexFa=0; renderFaFlashcard();">
+                        <option value="" id="opt-all-review-days-fa">همه روزها</option>
+                        <option value="1">روز اول</option>
+                        <option value="2">روز دوم</option>
+                        <option value="3">روز سوم</option>
+                        <option value="4">روز چهارم</option>
+                        <option value="5">روز پنجم</option>
+                        <option value="6">روز ششم</option>
+                        <option value="7">روز هفتم</option>
+                        <option value="15">روز پانزدهم</option>
+                        <option value="30">روز سی‌ام</option>
+                    </select>
+                    <select id="review-fa-filter-status" onchange="saveFilters(); currentCardIndexFa=0; renderFaFlashcard();">
+                        <option value="" id="opt-all-status-fa">همه وضعیت‌ها</option>
+                        <option value="pending" id="opt-status-pending-fa">مرور نشده‌های امروز</option>
+                        <option value="done" id="opt-status-done-fa">مرورشده‌های امروز</option>
+                    </select>
+                    <select id="review-fa-filter-unit" onchange="saveFilters(); currentCardIndexFa=0; renderFaFlashcard();">
+                        <option value="" id="opt-all-review-units-fa">همه یونیت‌ها</option>
+                    </select>
+                    <select id="review-fa-filter-pos" onchange="saveFilters(); currentCardIndexFa=0; renderFaFlashcard();">
+                        <option value="" id="opt-all-review-pos-fa">همه نوع کلمات</option>
+                    </select>
+                </div>
+                <div id="flashcard-container-fa"><p>در حال بارگذاری...</p></div>
+            </div>
+
+            <!-- تب مترادف و متضاد -->
+            <div id="tab-synonyms" class="card-box hidden">
+                <div class="filter-bar">
+                    <select id="syn-filter-step" onchange="saveFilters(); currentCardIndexSyn=0; renderSynonymsSection();">
+                        <option value="" id="opt-all-syn-days">همه روزها</option>
+                        <option value="1">روز اول</option>
+                        <option value="2">روز دوم</option>
+                        <option value="3">روز سوم</option>
+                        <option value="4">روز چهارم</option>
+                        <option value="5">روز پنجم</option>
+                        <option value="6">روز ششم</option>
+                        <option value="7">روز هفتم</option>
+                        <option value="15">روز پانزدهم</option>
+                        <option value="30">روز سی‌ام</option>
+                    </select>
+                    <select id="syn-filter-unit" onchange="saveFilters(); currentCardIndexSyn=0; renderSynonymsSection();">
+                        <option value="" id="opt-all-syn-units">همه یونیت‌ها</option>
+                    </select>
+                    <select id="syn-filter-pos" onchange="saveFilters(); currentCardIndexSyn=0; renderSynonymsSection();">
+                        <option value="" id="opt-all-syn-pos">همه نوع کلمات</option>
+                    </select>
+                </div>
+                <div id="synonyms-container"><p>در حال بارگذاری...</p></div>
+            </div>
+
+            <!-- تب بازی حدس کلمه -->
+            <div id="tab-game" class="card-box hidden">
+                <div class="filter-bar">
+                    <select id="game-filter-unit" onchange="initGameWord()">
+                        <option value="" id="opt-all-game-units">همه یونیت‌ها</option>
+                    </select>
+                    <button onclick="initGameWord()" style="background: var(--accent);" id="btn-next-game-word">کلمه بعدی 🔀</button>
+                </div>
+                <div id="game-card-area"><p>در حال بارگذاری بازی...</p></div>
+            </div>
+
+            <!-- تب مدیریت و افزودن -->
+            <div id="tab-manage" class="card-box hidden">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                    <h3 id="h-manage-title" style="margin:0;">افزودن و مدیریت کلمات</h3>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="exportToExcel()" style="background: var(--accent); padding: 8px 12px; font-size: 13px;">📥 خروجی اکسل</button>
+                        <button onclick="deleteSelectedWords()" style="background: var(--danger); padding: 8px 12px; font-size: 13px;" id="btn-delete-selected">🗑️ حذف موارد انتخاب‌شده</button>
+                    </div>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <h4 id="h-excel-sec">افزودن گروهی با اکسل</h4>
+                    <button onclick="downloadTemplate()" id="btn-dl-template" style="background: var(--accent);">دانلود فایل نمونه اکسل</button>
+                    <input type="file" id="excel-file" accept=".xlsx, .xls" style="display:block; margin: 10px 0;">
+                    <button onclick="uploadExcel()" id="btn-upload-excel">آپلود و ثبت کلمات</button>
+                </div>
+
+                <hr style="border-color: var(--border);">
+
+                <h4 id="h-single-sec">افزودن کلمه تکی</h4>
+                <input type="text" id="add-unit" placeholder="دسته‌بندی / Unit" style="width: 100%; box-sizing: border-box;">
+                <input type="text" id="add-word" placeholder="کلمه انگلیسی" style="width: 100%; box-sizing: border-box;">
+                
+                <select id="add-pos" style="width: 100%; box-sizing: border-box;">
+                    <option value="Noun (اسم)">اسم (Noun)</option>
+                    <option value="Verb (فعل)">فعل (Verb)</option>
+                    <option value="Adjective (صفت)">صفت (Adjective)</option>
+                    <option value="Adverb (قید)">قید (Adverb)</option>
+                    <option value="Pronoun (ضمیر)">ضمیر (Pronoun)</option>
+                    <option value="Preposition (حرف اضافه)">حرف اضافه (Preposition)</option>
+                    <option value="Conjunction (حرف ربط)">حرف ربط (Conjunction)</option>
+                    <option value="Other (سایر)">سایر (Other)</option>
+                </select>
+
+                <input type="text" id="add-pronun" placeholder="تلفظ" style="width: 100%; box-sizing: border-box;">
+                <input type="text" id="add-meaning" placeholder="معنی فارسی" style="width: 100%; box-sizing: border-box;">
+                <input type="text" id="add-synonyms" placeholder="مترادف‌ها (با کاما جدا کنید)" style="width: 100%; box-sizing: border-box;">
+                <input type="text" id="add-antonyms" placeholder="متضادها (با کاما جدا کنید)" style="width: 100%; box-sizing: border-box;">
+                <textarea id="add-example" placeholder="مثال" style="width: 100%; box-sizing: border-box;"></textarea>
+                <button onclick="addSingleWord()" id="btn-save-word" style="width: 100%;">ذخیره کلمه</button>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px;">
+                    <h4 id="h-words-list" style="margin: 0;">لیست کلمات ثبت‌شده</h4>
+                    <div>
+                        <input type="checkbox" id="select-all-checkbox" onclick="toggleSelectAll(this)"> <label for="select-all-checkbox" style="font-size: 13px;" id="lbl-select-all">انتخاب همه</label>
+                    </div>
+                </div>
+                <div id="words-list-container" style="max-height: 300px; overflow-y: auto; margin-top: 10px;"></div>
+            </div>
+
+            <!-- تب آمار و گزارش -->
+            <div id="tab-stats" class="card-box hidden">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 id="h-stats-title" style="margin: 0;">گزارش و آمار</h3>
+                </div>
+
+                <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="stat-card main-stat"><div class="stat-label" id="st-label-total">کل کلمات</div><div class="stat-number" id="stat-total">0</div></div>
+                    <div class="stat-card main-stat"><div class="stat-label" id="st-label-ready">آماده مرور</div><div class="stat-number" id="stat-ready">0</div></div>
+                    <div class="stat-card"><div class="stat-label" id="st-label-s1">روز اول</div><div class="stat-number" id="stat-step-1">0</div></div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="stat-label" id="st-label-s2">روز دوم</div><div class="stat-number" id="stat-step-2">0</div></div>
+                    <div class="stat-card"><div class="stat-label" id="st-label-s3">روز سوم</div><div class="stat-number" id="stat-step-3">0</div></div>
+                    <div class="stat-card"><div class="stat-label" id="st-label-s4">روز چهارم</div><div class="stat-number" id="stat-step-4">0</div></div>
+                    <div class="stat-card"><div class="stat-label" id="st-label-s5">روز پنجم</div><div class="stat-number" id="stat-step-5">0</div></div>
+                    <div class="stat-card"><div class="stat-label" id="st-label-s6">روز ششم</div><div class="stat-number" id="stat-step-6">0</div></div>
+                    <div class="stat-card"><div class="stat-label" id="st-label-s7">روز هفتم</div><div class="stat-number" id="stat-step-7">0</div></div>
+                    <div class="stat-card"><div class="stat-label" id="st-label-s15">روز پانزدهم</div><div class="stat-number" id="stat-step-15">0</div></div>
+                </div>
+
+                <div style="background: var(--bg-color); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
+                    <canvas id="progressChart" style="max-height: 250px;"></canvas>
+                </div>
+
+                <div class="filter-bar" style="margin-bottom: 15px;">
+                    <select id="filter-unit" onchange="saveFilters(); renderStatsTable();">
+                        <option value="" id="opt-all-units">همه یونیت‌ها</option>
+                    </select>
+                    <select id="filter-step" onchange="saveFilters(); renderStatsTable();">
+                        <option value="" id="opt-all-days">همه روزها</option>
+                        <option value="1">روز اول</option>
+                        <option value="2">روز دوم</option>
+                        <option value="3">روز سوم</option>
+                        <option value="4">روز چهارم</option>
+                        <option value="5">روز پنجم</option>
+                        <option value="6">روز ششم</option>
+                        <option value="7">روز هفتم</option>
+                        <option value="15">روز پانزدهم</option>
+                        <option value="30">روز سی‌ام</option>
+                    </select>
+                    <select id="filter-pos" onchange="saveFilters(); renderStatsTable();">
+                        <option value="" id="opt-all-pos">همه نوع کلمات</option>
+                    </select>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table style="width:100%; border-collapse: collapse; font-size: 14px; text-align: center;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border); color: #94a3b8;">
+                                <th style="padding: 10px;" id="th-unit">Unit</th>
+                                <th id="th-card-no">شماره کارت</th>
+                                <th id="th-word">کلمه</th>
+                                <th id="th-pos">نوع کلمه</th>
+                                <th id="th-meaning">معنی</th>
+                                <th id="th-status">وضعیت (روز)</th>
+                                <th id="th-last">آخرین مطالعه</th>
+                                <th id="th-next">مرور بعدی</th>
+                                <th id="th-action">عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stats-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- مودال ویرایش -->
+    <div id="edit-modal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000;">
+        <div class="card-box" style="width: 400px; background: var(--card-bg);">
+            <h3 id="h-edit-title">ویرایش کلمه</h3>
+            <input type="hidden" id="edit-id">
+            <input type="text" id="edit-unit-input" placeholder="Unit" style="width: 100%; box-sizing: border-box;">
+            <input type="text" id="edit-word-input" placeholder="کلمه انگلیسی" style="width: 100%; box-sizing: border-box;">
+            <select id="edit-pos-input" style="width: 100%; box-sizing: border-box;">
+                <option value="Noun (اسم)">اسم (Noun)</option>
+                <option value="Verb (فعل)">فعل (Verb)</option>
+                <option value="Adjective (صفت)">صفت (Adjective)</option>
+                <option value="Adverb (قید)">قید (Adverb)</option>
+                <option value="Pronoun (ضمیر)">ضمیر (Pronoun)</option>
+                <option value="Preposition (حرف اضافه)">حرف اضافه (Preposition)</option>
+                <option value="Conjunction (حرف ربط)">حرف ربط (Conjunction)</option>
+                <option value="Other (سایر)">سایر (Other)</option>
+            </select>
+            <input type="text" id="edit-pronun-input" placeholder="تلفظ" style="width: 100%; box-sizing: border-box;">
+            <input type="text" id="edit-meaning-input" placeholder="معنی فارسی" style="width: 100%; box-sizing: border-box;">
+            <input type="text" id="edit-synonyms-input" placeholder="مترادف‌ها" style="width: 100%; box-sizing: border-box;">
+            <input type="text" id="edit-antonyms-input" placeholder="متضادها" style="width: 100%; box-sizing: border-box;">
+            <textarea id="edit-example-input" placeholder="مثال" style="width: 100%; box-sizing: border-box;"></textarea>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button onclick="saveEditedWord()" id="btn-save-edit" style="background: var(--accent); flex: 1;">ذخیره تغییرات</button>
+                <button onclick="closeEditModal()" id="btn-cancel-edit" style="background: var(--danger); flex: 1;">انصراف</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://miqzqlkziyonkvtxcqif.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_la5VpP17yWPKpWrHsgUc-Q_NrGoH2Oj';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let allCards = [];
+        let currentUser = null;
+        let currentCardIndexEn = 0;
+        let currentCardIndexFa = 0;
+        let currentCardIndexSyn = 0;
+        let currentGameCard = null;
+        let myChart = null;
+        let currentLang = 'fa';
+
+        const translations = {
+            fa: {
+                appTitle: "لایتنر هوشمند",
+                navEnFa: "مرور (انگلیسی به فارسی)",
+                navFaEn: "مرور (فارسی به انگلیسی)",
+                navSyn: "مترادف و متضاد",
+                navGame: "بازی حدس کلمه",
+                navManage: "افزودن و اکسل",
+                navStats: "گزارش و آمار",
+                hManage: "افزودن و مدیریت کلمات",
+                hExcelSec: "افزودن گروهی با اکسل",
+                btnDlTemplate: "دانلود فایل نمونه اکسل",
+                btnUploadExcel: "آپلود و ثبت کلمات",
+                hSingleSec: "افزودن کلمه تکی",
+                btnSaveWord: "ذخیره کلمه",
+                hWordsList: "لیست کلمات ثبت‌شده",
+                hStatsTitle: "گزارش و آمار",
+                stTotal: "کل کلمات",
+                stReady: "آماده مرور",
+                stS1: "روز اول", stS2: "روز دوم", stS3: "روز سوم", stS4: "روز چهارم", stS5: "روز پنجم", stS6: "روز ششم", stS7: "روز هفتم", stS15: "روز پانزدهم", stS30: "روز سی‌ام",
+                optAllUnits: "همه یونیت‌ها",
+                optAllDays: "همه روزها",
+                optAllPos: "همه نوع کلمات",
+                optAllReviewDays: "همه روزها",
+                optAllReviewUnits: "همه یونیت‌ها",
+                optAllReviewPos: "همه نوع کلمات",
+                optAllStatus: "همه وضعیت‌ها",
+                optStatusPending: "مرور نشده‌های امروز",
+                optStatusDone: "مرورشده‌های امروز",
+                thUnit: "Unit", thCardNo: "شماره کارت", thWord: "کلمه", thPos: "نوع کلمه", thMeaning: "معنی", thStatus: "وضعیت (روز)", thLast: "آخرین مطالعه", thNext: "مرور بعدی", thAction: "عملیات",
+                editTitle: "ویرایش کلمه", btnSaveEdit: "ذخیره تغییرات", btnCancelEdit: "انصراف",
+                clickToFlip: "(برای دیدن پاسخ روی کارت کلیک کنید)",
+                btnHard: "بلد نبودم (سخت)", btnEasy: "بلد بودم (آسان)",
+                btnPrev: "◀ قبلی", btnNext: "بعدی ▶",
+                congrats: "تبریک! تمام کارت‌ها مرور شدند.",
+                noSyn: "کلمه‌ای که دارای مترادف یا متضاد باشد یافت نشد.",
+                editBtn: "ویرایش", deleteBtn: "حذف",
+                deleteSelected: "🗑️ حذف موارد انتخاب‌شده",
+                selectAll: "انتخاب همه"
+            },
+            en: {
+                appTitle: "Smart Leitner",
+                navEnFa: "Review (EN to FA)",
+                navFaEn: "Review (FA to EN)",
+                navSyn: "Synonyms & Antonyms",
+                navGame: "Word Scramble Game",
+                navManage: "Add & Excel",
+                navStats: "Reports & Stats",
+                hManage: "Add & Manage Words",
+                hExcelSec: "Bulk Add via Excel",
+                btnDlTemplate: "Download Excel Template",
+                btnUploadExcel: "Upload & Save Words",
+                hSingleSec: "Add Single Word",
+                btnSaveWord: "Save Word",
+                hWordsList: "Registered Words List",
+                hStatsTitle: "Reports & Statistics",
+                stTotal: "Total Words",
+                stReady: "Ready to Review",
+                stS1: "Day 1", stS2: "Day 2", stS3: "Day 3", stS4: "Day 4", stS5: "Day 5", stS6: "Day 6", stS7: "Day 7", stS15: "Day 15", stS30: "Day 30",
+                optAllUnits: "All Units",
+                optAllDays: "All Days",
+                optAllPos: "All Parts of Speech",
+                optAllReviewDays: "All Days",
+                optAllReviewUnits: "All Units",
+                optAllReviewPos: "All Parts of Speech",
+                optAllStatus: "All Statuses",
+                optStatusPending: "Not reviewed today",
+                optStatusDone: "Reviewed today",
+                thUnit: "Unit", thCardNo: "Card No.", thWord: "Word", thPos: "Part of Speech", thMeaning: "Meaning", thStatus: "Status (Day)", thLast: "Last Review", thNext: "Next Review", thAction: "Action",
+                editTitle: "Edit Word", btnSaveEdit: "Save Changes", btnCancelEdit: "Cancel",
+                clickToFlip: "(Click card to see the answer)",
+                btnHard: "Hard", btnEasy: "Easy",
+                btnPrev: "◀ Prev", btnNext: "Next ▶",
+                congrats: "Congratulations! All cards reviewed.",
+                noSyn: "No words with synonyms or antonyms found.",
+                editBtn: "Edit", deleteBtn: "Delete",
+                deleteSelected: "🗑️ Delete Selected",
+                selectAll: "Select All"
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                currentUser = session.user;
+                showApp();
+            }
+
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                if (session) {
+                    currentUser = session.user;
+                    showApp();
+                } else {
+                    currentUser = null;
+                    showAuth();
+                }
+            });
+        });
+
+        async function handleSignup() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const errEl = document.getElementById('auth-error');
+            errEl.innerText = '';
+
+            const { error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) {
+                errEl.innerText = error.message;
+            } else {
+                alert(currentLang === 'fa' ? 'ثبت‌نام با موفقیت انجام شد.' : 'Signup successful!');
+            }
+        }
+
+        async function handleLogin() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const errEl = document.getElementById('auth-error');
+            errEl.innerText = '';
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                errEl.innerText = error.message;
+            } else {
+                currentUser = data.user;
+                showApp();
+            }
+        }
+
+        async function handleLogout() {
+            await supabaseClient.auth.signOut();
+            currentUser = null;
+            showAuth();
+        }
+
+        function showAuth() {
+            document.getElementById('auth-container').classList.remove('hidden');
+            document.getElementById('app-main-container').classList.add('hidden');
+        }
+
+        function showApp() {
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('app-main-container').classList.remove('hidden');
+            if (currentUser) {
+                document.getElementById('user-email-display').innerText = `(${currentUser.email})`;
+            }
+            loadCards();
+        }
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'fa' ? 'en' : 'fa';
+            const root = document.getElementById('html-root');
+            root.setAttribute('lang', currentLang);
+            root.setAttribute('dir', currentLang === 'fa' ? 'rtl' : 'ltr');
+            updateTexts();
+            loadCards();
+            updateSmartReminder();
+        }
+
+        function updateTexts() {
+            const t = translations[currentLang];
+            document.getElementById('app-title').innerText = t.appTitle;
+            document.getElementById('nav-en-fa').innerText = t.navEnFa;
+            document.getElementById('nav-fa-en').innerText = t.navFaEn;
+            document.getElementById('nav-syn').innerText = t.navSyn;
+            document.getElementById('nav-game').innerText = t.navGame;
+            document.getElementById('nav-manage').innerText = t.navManage;
+            document.getElementById('nav-stats').innerText = t.navStats;
+            document.getElementById('h-manage-title').innerText = t.hManage;
+            document.getElementById('h-excel-sec').innerText = t.hExcelSec;
+            document.getElementById('btn-dl-template').innerText = t.btnDlTemplate;
+            document.getElementById('btn-upload-excel').innerText = t.btnUploadExcel;
+            document.getElementById('h-single-sec').innerText = t.hSingleSec;
+            document.getElementById('btn-save-word').innerText = t.btnSaveWord;
+            document.getElementById('h-words-list').innerText = t.hWordsList;
+            document.getElementById('h-stats-title').innerText = t.hStatsTitle;
+            document.getElementById('st-label-total').innerText = t.stTotal;
+            document.getElementById('st-label-ready').innerText = t.stReady;
+            document.getElementById('st-label-s1').innerText = t.stS1;
+            document.getElementById('st-label-s2').innerText = t.stS2;
+            document.getElementById('st-label-s3').innerText = t.stS3;
+            document.getElementById('st-label-s4').innerText = t.stS4;
+            document.getElementById('st-label-s5').innerText = t.stS5;
+            document.getElementById('st-label-s6').innerText = t.stS6;
+            document.getElementById('st-label-s7').innerText = t.stS7;
+            document.getElementById('st-label-s15').innerText = t.stS15;
+            document.getElementById('st-label-s30').innerText = t.stS30;
+            document.getElementById('opt-all-units').innerText = t.optAllUnits;
+            document.getElementById('opt-all-days').innerText = t.optAllDays;
+            document.getElementById('opt-all-pos').innerText = t.optAllPos;
+            document.getElementById('opt-all-review-days').innerText = t.optAllReviewDays;
+            document.getElementById('opt-all-review-units').innerText = t.optAllReviewUnits;
+            document.getElementById('opt-all-review-pos').innerText = t.optAllReviewPos;
+            document.getElementById('opt-all-review-days-fa').innerText = t.optAllReviewDays;
+            document.getElementById('opt-all-review-units-fa').innerText = t.optAllReviewUnits;
+            document.getElementById('opt-all-review-pos-fa').innerText = t.optAllReviewPos;
+            document.getElementById('opt-all-syn-days').innerText = t.optAllReviewDays;
+            document.getElementById('opt-all-syn-units').innerText = t.optAllReviewUnits;
+            document.getElementById('opt-all-syn-pos').innerText = t.optAllReviewPos;
+            document.getElementById('opt-all-game-units').innerText = t.optAllReviewUnits;
+            document.getElementById('opt-all-status').innerText = t.optAllStatus;
+            document.getElementById('opt-status-pending').innerText = t.optStatusPending;
+            document.getElementById('opt-status-done').innerText = t.optStatusDone;
+            document.getElementById('opt-all-status-fa').innerText = t.optAllStatus;
+            document.getElementById('opt-status-pending-fa').innerText = t.optStatusPending;
+            document.getElementById('opt-status-done-fa').innerText = t.optStatusDone;
+            document.getElementById('th-unit').innerText = t.thUnit;
+            document.getElementById('th-card-no').innerText = t.thCardNo;
+            document.getElementById('th-word').innerText = t.thWord;
+            document.getElementById('th-pos').innerText = t.thPos;
+            document.getElementById('th-meaning').innerText = t.thMeaning;
+            document.getElementById('th-status').innerText = t.thStatus;
+            document.getElementById('th-last').innerText = t.thLast;
+            document.getElementById('th-next').innerText = t.thNext;
+            document.getElementById('th-action').innerText = t.thAction;
+            document.getElementById('h-edit-title').innerText = t.editTitle;
+            document.getElementById('btn-save-edit').innerText = t.btnSaveEdit;
+            document.getElementById('btn-cancel-edit').innerText = t.btnCancelEdit;
+            document.getElementById('btn-delete-selected').innerText = t.deleteSelected;
+            document.getElementById('lbl-select-all').innerText = t.selectAll;
+        }
+
+        function switchTab(tabName) {
+            document.getElementById('tab-review').classList.add('hidden');
+            document.getElementById('tab-review-fa').classList.add('hidden');
+            document.getElementById('tab-synonyms').classList.add('hidden');
+            document.getElementById('tab-game').classList.add('hidden');
+            document.getElementById('tab-manage').classList.add('hidden');
+            document.getElementById('tab-stats').classList.add('hidden');
+            
+            if (tabName === 'review') {
+                document.getElementById('tab-review').classList.remove('hidden');
+                loadCards();
+            } else if (tabName === 'review-fa') {
+                document.getElementById('tab-review-fa').classList.remove('hidden');
+                loadCards();
+            } else if (tabName === 'synonyms') {
+                document.getElementById('tab-synonyms').classList.remove('hidden');
+                updateFilterDropdowns();
+                renderSynonymsSection();
+            } else if (tabName === 'game') {
+                document.getElementById('tab-game').classList.remove('hidden');
+                updateFilterDropdowns();
+                initGameWord();
+            } else if (tabName === 'manage') {
+                document.getElementById('tab-manage').classList.remove('hidden');
+                renderWordsList();
+            } else if (tabName === 'stats') {
+                document.getElementById('tab-stats').classList.remove('hidden');
+                initStatsView();
+            }
+        }
+
+        async function loadCards() {
+            if (!currentUser) return;
+            const todayStr = new Date().toISOString().split('T')[0];
+            
+            const { data, error } = await supabaseClient
+                .from('leitner_cards')
+                .select('*')
+                .eq('user_id', currentUser.id);
+            
+            if (error) {
+                console.error('Error loading cards:', error);
+                allCards = [];
+            } else {
+                allCards = data || [];
+            }
+
+            allCards = allCards.map(card => {
+                if (card.last_review_date !== todayStr) {
+                    card.reviewed_today = false;
+                }
+                if (!card.review_history || !Array.isArray(card.review_history)) {
+                    card.review_history = [null, null, null, null, null, null, null];
+                }
+                return card;
+            });
+
+            updateFilterDropdowns();
+            restoreFilters();
+            renderEnFlashcard();
+            renderFaFlashcard();
+            updateSmartReminder();
+        }
+
+        function updateSmartReminder() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const readyCount = allCards.filter(c => !c.next_review || c.next_review <= todayStr).length;
+            const reminderText = document.getElementById('reminder-text');
+            if (reminderText) {
+                if (readyCount > 0) {
+                    reminderText.innerHTML = currentLang === 'fa' ? 
+                        `🔔 یادآور هوشمند: شما امروز <b>${readyCount}</b> کلمه آماده برای مرور دارید!` :
+                        `🔔 Smart Reminder: You have <b>${readyCount}</b> words ready for review today!`;
+                } else {
+                    reminderText.innerHTML = currentLang === 'fa' ? 
+                        `🎉 یادآور هوشمند: عالیه! همه کلمات امروز مرور شدند.` :
+                        `🎉 Smart Reminder: Awesome! All words reviewed for today.`;
+                }
+            }
+        }
+
+        function requestNotificationPermission() {
+            if (!("Notification" in window)) {
+                alert(currentLang === 'fa' ? 'مرورگر شما از اعلان‌ها پشتیبانی نمی‌کند.' : 'Browser does not support notifications.');
+                return;
+            }
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    alert(currentLang === 'fa' ? 'اعلان‌ها با موفقیت فعال شدند!' : 'Notifications enabled successfully!');
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const readyCount = allCards.filter(c => !c.next_review || c.next_review <= todayStr).length;
+                    if (readyCount > 0) {
+                        new Notification(currentLang === 'fa' ? 'یادآور لایتنر هوشمند' : 'Smart Leitner Reminder', {
+                            body: currentLang === 'fa' ? `شما ${readyCount} کلمه برای مرور دارید!` : `You have ${readyCount} words to review!`
+                        });
+                    }
+                } else {
+                    alert(currentLang === 'fa' ? 'اجازه دسترسی به اعلان داده نشد.' : 'Notification permission denied.');
+                }
+            });
+        }
+
+        function updateFilterDropdowns() {
+            const units = [...new Set(allCards.map(c => c.unit || 'عمومی'))];
+            const posList = [...new Set(allCards.map(c => c.pos || 'Other (سایر)'))];
+            const t = translations[currentLang];
+
+            const dropdownIds = [
+                { unit: 'review-filter-unit', pos: 'review-filter-pos' },
+                { unit: 'review-fa-filter-unit', pos: 'review-fa-filter-pos' },
+                { unit: 'syn-filter-unit', pos: 'syn-filter-pos' },
+                { unit: 'filter-unit', pos: 'filter-pos' },
+                { unit: 'game-filter-unit', pos: null }
+            ];
+
+            dropdownIds.forEach(ids => {
+                const uSel = document.getElementById(ids.unit);
+                if (uSel) {
+                    let uHtml = `<option value="">${t.optAllReviewUnits}</option>`;
+                    units.forEach(u => { uHtml += `<option value="${u}">${u}</option>`; });
+                    uSel.innerHTML = uHtml;
+                }
+                if (ids.pos) {
+                    const pSel = document.getElementById(ids.pos);
+                    if (pSel) {
+                        let pHtml = `<option value="">${t.optAllReviewPos}</option>`;
+                        posList.forEach(p => { pHtml += `<option value="${p}">${p}</option>`; });
+                        pSel.innerHTML = pHtml;
+                    }
+                }
+            });
+        }
+
+        function saveFilters() {
+            const filters = {
+                reviewStep: document.getElementById('review-filter-step').value,
+                reviewStatus: document.getElementById('review-filter-status').value,
+                reviewUnit: document.getElementById('review-filter-unit').value,
+                reviewPos: document.getElementById('review-filter-pos').value,
+
+                reviewFaStep: document.getElementById('review-fa-filter-step').value,
+                reviewFaStatus: document.getElementById('review-fa-filter-status').value,
+                reviewFaUnit: document.getElementById('review-fa-filter-unit').value,
+                reviewFaPos: document.getElementById('review-fa-filter-pos').value,
+
+                synStep: document.getElementById('syn-filter-step').value,
+                synUnit: document.getElementById('syn-filter-unit').value,
+                synPos: document.getElementById('syn-filter-pos').value,
+
+                gameUnit: document.getElementById('game-filter-unit').value,
+
+                statsUnit: document.getElementById('filter-unit').value,
+                statsStep: document.getElementById('filter-step').value,
+                statsPos: document.getElementById('filter-pos').value
+            };
+            localStorage.setItem('leitner_filters', JSON.stringify(filters));
+        }
+
+        function restoreFilters() {
+            const saved = localStorage.getItem('leitner_filters');
+            if (!saved) return;
+            try {
+                const f = JSON.parse(saved);
+                if (f.reviewStep) document.getElementById('review-filter-step').value = f.reviewStep;
+                if (f.reviewStatus) document.getElementById('review-filter-status').value = f.reviewStatus;
+                if (f.reviewUnit) document.getElementById('review-filter-unit').value = f.reviewUnit;
+                if (f.reviewPos) document.getElementById('review-filter-pos').value = f.reviewPos;
+
+                if (f.reviewFaStep) document.getElementById('review-fa-filter-step').value = f.reviewFaStep;
+                if (f.reviewFaStatus) document.getElementById('review-fa-filter-status').value = f.reviewFaStatus;
+                if (f.reviewFaUnit) document.getElementById('review-fa-filter-unit').value = f.reviewFaUnit;
+                if (f.reviewFaPos) document.getElementById('review-fa-filter-pos').value = f.reviewFaPos;
+
+                if (f.synStep) document.getElementById('syn-filter-step').value = f.synStep;
+                if (f.synUnit) document.getElementById('syn-filter-unit').value = f.synUnit;
+                if (f.synPos) document.getElementById('syn-filter-pos').value = f.synPos;
+
+                if (f.gameUnit) document.getElementById('game-filter-unit').value = f.gameUnit;
+
+                if (f.statsUnit) document.getElementById('filter-unit').value = f.statsUnit;
+                if (f.statsStep) document.getElementById('filter-step').value = f.statsStep;
+                if (f.statsPos) document.getElementById('filter-pos').value = f.statsPos;
+            } catch (e) {
+                console.error("Error restoring filters", e);
+            }
+        }
+
+        function getFilteredCards() {
+            let stepFilter = document.getElementById('review-filter-step').value;
+            let statusFilter = document.getElementById('review-filter-status').value;
+            let unitFilter = document.getElementById('review-filter-unit').value;
+            let posFilter = document.getElementById('review-filter-pos').value;
+
+            return allCards.filter(card => {
+                let matchStep = stepFilter ? String(card.step) === stepFilter : true;
+                let matchStatus = statusFilter === 'done' ? card.reviewed_today : (statusFilter === 'pending' ? !card.reviewed_today : true);
+                let matchUnit = unitFilter ? (card.unit || 'عمومی') === unitFilter : true;
+                let matchPos = posFilter ? (card.pos || 'Other (سایر)') === posFilter : true;
+                return matchStep && matchStatus && matchUnit && matchPos;
+            });
+        }
+
+        function getFilteredCardsFa() {
+            let stepFilter = document.getElementById('review-fa-filter-step').value;
+            let statusFilter = document.getElementById('review-fa-filter-status').value;
+            let unitFilter = document.getElementById('review-fa-filter-unit').value;
+            let posFilter = document.getElementById('review-fa-filter-pos').value;
+
+            return allCards.filter(card => {
+                let matchStep = stepFilter ? String(card.step) === stepFilter : true;
+                let matchStatus = statusFilter === 'done' ? card.reviewed_today : (statusFilter === 'pending' ? !card.reviewed_today : true);
+                let matchUnit = unitFilter ? (card.unit || 'عمومی') === unitFilter : true;
+                let matchPos = posFilter ? (card.pos || 'Other (سایر)') === posFilter : true;
+                return matchStep && matchStatus && matchUnit && matchPos;
+            });
+        }
+
+        function getFilteredSynCards() {
+            let stepFilter = document.getElementById('syn-filter-step').value;
+            let unitFilter = document.getElementById('syn-filter-unit').value;
+            let posFilter = document.getElementById('syn-filter-pos').value;
+
+            return allCards.filter(card => {
+                let hasSynOrAnt = (card.synonyms && card.synonyms.trim() !== '') || (card.antonyms && card.antonyms.trim() !== '');
+                let matchStep = stepFilter ? String(card.step) === stepFilter : true;
+                let matchUnit = unitFilter ? (card.unit || 'عمومی') === unitFilter : true;
+                let matchPos = posFilter ? (card.pos || 'Other (سایر)') === posFilter : true;
+                return hasSynOrAnt && matchStep && matchUnit && matchPos;
+            });
+        }
+
+        function getUnitCardNumber(targetCard) {
+            const unitName = targetCard.unit || 'عمومی';
+            let count = 0;
+            for (let i = 0; i < allCards.length; i++) {
+                const c = allCards[i];
+                if ((c.unit || 'عمومی') === unitName) {
+                    count++;
+                    if (String(c.id) === String(targetCard.id)) {
+                        return count;
+                    }
+                }
+            }
+            return 1;
+        }
+
+        function renderHistorySquares(historyArray) {
+            let history = historyArray;
+            if (!history || !Array.isArray(history)) {
+                history = [null, null, null, null, null, null, null];
+            }
+            let html = '<div class="history-squares-container">';
+            for (let i = 0; i < 7; i++) {
+                let val = history[i];
+                let cls = '';
+                let symbol = '';
+                if (val === true) {
+                    cls = 'correct';
+                    symbol = '✔';
+                } else if (val === false) {
+                    cls = 'wrong';
+                    symbol = '✖';
+                }
+                html += `<div class="history-square ${cls}">${symbol}</div>`;
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function renderEnFlashcard() {
+            const container = document.getElementById('flashcard-container');
+            const t = translations[currentLang];
+            const filteredCards = getFilteredCards();
+
+            if (filteredCards.length === 0 || currentCardIndexEn >= filteredCards.length) {
+                if (currentCardIndexEn > 0 && filteredCards.length > 0) currentCardIndexEn = filteredCards.length - 1;
+                if (filteredCards.length === 0) {
+                    container.innerHTML = `<p style="text-align:center; color: var(--accent);">${t.congrats}</p>`;
+                    return;
+                }
+            }
+
+            const card = filteredCards[currentCardIndexEn];
+            const unitCardNo = getUnitCardNumber(card);
+            let statusText = card.reviewed_today ? `<span style="color: var(--accent);">✔ ${currentLang === 'fa' ? 'امروز مرور شده' : 'Reviewed today'}</span>` : `<span style="color: var(--danger);">✖ ${currentLang === 'fa' ? 'امروز مرور نشده' : 'Not reviewed'}</span>`;
+            let historySquaresHtml = renderHistorySquares(card.review_history);
+
+            container.innerHTML = `
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; align-items: center;">
+                    ${historySquaresHtml}
+                    <span>${statusText}</span>
+                </div>
+                <div class="flashcard-scene" onclick="this.querySelector('.flashcard').classList.toggle('is-flipped')">
+                    <div class="flashcard">
+                        <div class="flashcard-face">
+                            <span class="badge" style="margin-bottom: 10px;">${card.unit || 'عمومی'} - #${unitCardNo}</span>
+                            <h2 style="margin-bottom: 5px;">${card.word}</h2>
+                            ${card.pos ? `<div class="pos-badge">${card.pos}</div>` : ''}
+                            <p style="margin-top: 5px;">${currentLang === 'fa' ? 'تلفظ:' : 'Pronunciation:'} ${card.pronun || '-'}</p>
+                            ${card.example ? `<p style="font-size: 16px; opacity: 0.9; margin-top: 8px; font-style: italic;">"${card.example}"</p>` : ''}
+                            <p style="font-size: 12px; opacity: 0.6; margin-top: 15px;">${t.clickToFlip}</p>
+                        </div>
+                        <div class="flashcard-face flashcard-face-back">
+                            <span class="badge" style="margin-bottom: 10px;">${card.unit || 'عمومی'} - #${unitCardNo}</span>
+                            <p style="margin: 6px 0;"><strong>${currentLang === 'fa' ? 'معنی:' : 'Meaning:'}</strong> ${card.meaning}</p>
+                            <p style="margin: 6px 0;"><strong>${currentLang === 'fa' ? 'مترادف‌ها:' : 'Synonyms:'}</strong> ${card.synonyms || '-'}</p>
+                            <p style="margin: 6px 0;"><strong>${currentLang === 'fa' ? 'متضادها:' : 'Antonyms:'}</strong> ${card.antonyms || '-'}</p>
+                            <p style="margin: 6px 0;"><strong>${currentLang === 'fa' ? 'مثال:' : 'Example:'}</strong> ${card.example || '-'}</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
+                    <button onclick="navigateCard(-1, 'en')" style="background: var(--border); padding: 10px 15px;" ${currentCardIndexEn === 0 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>${t.btnPrev}</button>
+                    <button onclick="handleCardResponse('${card.id}', false, 'en')" style="background: var(--danger); flex: 1;">${t.btnHard}</button>
+                    <button onclick="handleCardResponse('${card.id}', true, 'en')" style="background: var(--accent); flex: 1;">${t.btnEasy}</button>
+                    <button onclick="navigateCard(1, 'en')" style="background: var(--border); padding: 10px 15px;" ${currentCardIndexEn >= filteredCards.length - 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>${t.btnNext}</button>
+                </div>
+            `;
+        }
+
+        function renderFaFlashcard() {
+            const container = document.getElementById('flashcard-container-fa');
+            const t = translations[currentLang];
+            const filteredCards = getFilteredCardsFa();
+
+            if (filteredCards.length === 0 || currentCardIndexFa >= filteredCards.length) {
+                if (currentCardIndexFa > 0 && filteredCards.length > 0) currentCardIndexFa = filteredCards.length - 1;
+                if (filteredCards.length === 0) {
+                    container.innerHTML = `<p style="text-align:center; color: var(--accent);">${t.congrats}</p>`;
+                    return;
+                }
+            }
+
+            const card = filteredCards[currentCardIndexFa];
+            const unitCardNo = getUnitCardNumber(card);
+            let statusText = card.reviewed_today ? `<span style="color: var(--accent);">✔ ${currentLang === 'fa' ? 'امروز مرور شده' : 'Reviewed today'}</span>` : `<span style="color: var(--danger);">✖ ${currentLang === 'fa' ? 'امروز مرور نشده' : 'Not reviewed'}</span>`;
+            let historySquaresHtml = renderHistorySquares(card.review_history);
+
+            container.innerHTML = `
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; align-items: center;">
+                    ${historySquaresHtml}
+                    <span>${statusText}</span>
+                </div>
+                <div class="flashcard-scene" onclick="this.querySelector('.flashcard').classList.toggle('is-flipped')">
+                    <div class="flashcard">
+                        <div class="flashcard-face">
+                            <span class="badge" style="margin-bottom: 10px;">${card.unit || 'عمومی'} - #${unitCardNo}</span>
+                            <h2 style="margin-bottom: 5px;">${card.meaning}</h2>
+                            ${card.pos ? `<div class="pos-badge">${card.pos}</div>` : ''}
+                            <p style="font-size: 13px; opacity: 0.7; margin-top: 5px;">${currentLang === 'fa' ? 'معنی فارسی - کلمه انگلیسی را حدس بزنید' : 'Guess English word'}</p>
+                            ${card.example ? `<p style="font-size: 16px; opacity: 0.9; margin-top: 8px; font-style: italic;">"${card.example}"</p>` : ''}
+                            <p style="font-size: 12px; opacity: 0.6; margin-top: 15px;">${t.clickToFlip}</p>
+                        </div>
+                        <div class="flashcard-face flashcard-face-back">
+                            <span class="badge" style="margin-bottom: 10px;">${card.unit || 'عمومی'} - #${unitCardNo}</span>
+                            <p style="margin: 6px 0;"><strong>${currentLang === 'fa' ? 'کلمه انگلیسی:' : 'Word:'}</strong> ${card.word}</p>
+                            <p style="margin: 6px 0;"><strong>${currentLang === 'fa' ? 'تلفظ:' : 'Pronunciation:'}</strong> ${card.pronun || '-'}</p>
+                            <p style="margin: 6px 0;"><strong>${currentLang === 'fa' ? 'مترادف‌ها:' : 'Synonyms:'}</strong> ${card.synonyms || '-'}</p>
+                            <p style="margin: 6px 0;"><strong>${currentLang === 'fa' ? 'متضادها:' : 'Antonyms:'}</strong> ${card.antonyms || '-'}</p>
+                            <p style="margin: 6px 0;"><strong>${currentLang === 'fa' ? 'مثال:' : 'Example:'}</strong> ${card.example || '-'}</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
+                    <button onclick="navigateCard(-1, 'fa')" style="background: var(--border); padding: 10px 15px;" ${currentCardIndexFa === 0 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>${t.btnPrev}</button>
+                    <button onclick="handleCardResponse('${card.id}', false, 'fa')" style="background: var(--danger); flex: 1;">${t.btnHard}</button>
+                    <button onclick="handleCardResponse('${card.id}', true, 'fa')" style="background: var(--accent); flex: 1;">${t.btnEasy}</button>
+                    <button onclick="navigateCard(1, 'fa')" style="background: var(--border); padding: 10px 15px;" ${currentCardIndexFa >= filteredCards.length - 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>${t.btnNext}</button>
+                </div>
+            `;
+        }
+
+        function renderSynonymsSection() {
+            const container = document.getElementById('synonyms-container');
+            const t = translations[currentLang];
+            const synCards = getFilteredSynCards();
+
+            if (synCards.length === 0 || currentCardIndexSyn >= synCards.length) {
+                if (currentCardIndexSyn > 0 && synCards.length > 0) currentCardIndexSyn = synCards.length - 1;
+                if (synCards.length === 0) {
+                    container.innerHTML = `<p style="text-align:center; color: var(--border);">${t.noSyn}</p>`;
+                    return;
+                }
+            }
+
+            const card = synCards[currentCardIndexSyn];
+            const unitCardNo = getUnitCardNumber(card);
+            let statusText = card.reviewed_today ? `<span style="color: var(--accent);">✔ ${currentLang === 'fa' ? 'امروز مرور شده' : 'Reviewed today'}</span>` : `<span style="color: var(--danger);">✖ ${currentLang === 'fa' ? 'امروز مرور نشده' : 'Not reviewed'}</span>`;
+            let historySquaresHtml = renderHistorySquares(card.review_history);
+
+            container.innerHTML = `
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; align-items: center;">
+                    ${historySquaresHtml}
+                    <span>${statusText}</span>
+                </div>
+                <div class="flashcard-scene" onclick="this.querySelector('.flashcard').classList.toggle('is-flipped')">
+                    <div class="flashcard">
+                        <div class="flashcard-face">
+                            <span class="badge" style="margin-bottom: 10px;">${card.unit || 'عمومی'} - #${unitCardNo}</span>
+                            <h3 style="margin-bottom: 5px;">${card.word}</h3>
+                            ${card.pos ? `<div class="pos-badge">${card.pos}</div>` : ''}
+                            <p style="font-size: 14px; opacity: 0.8; margin-top: 5px;">(${card.meaning})</p>
+                            <p style="font-size: 13px; color: var(--accent); margin-top: 5px;">${currentLang === 'fa' ? 'مترادف و متضاد این کلمه چیست؟' : 'Guess synonyms & antonyms'}</p>
+                            ${card.example ? `<p style="font-size: 16px; opacity: 0.9; margin-top: 8px; font-style: italic;">"${card.example}"</p>` : ''}
+                            <p style="font-size: 12px; opacity: 0.6; margin-top: 15px;">${t.clickToFlip}</p>
+                        </div>
+                        <div class="flashcard-face flashcard-face-back">
+                            <span class="badge" style="margin-bottom: 10px;">${card.unit || 'عمومی'} - #${unitCardNo}</span>
+                            <p style="margin: 4px 0;"><strong>${currentLang === 'fa' ? 'کلمه اصلی:' : 'Word:'}</strong> ${card.word} (${card.meaning})</p>
+                            <p style="margin: 8px 0;">🔹 <strong>${currentLang === 'fa' ? 'مترادف‌ها:' : 'Synonyms:'}</strong> ${card.synonyms || '-'}</p>
+                            <p style="margin: 8px 0;">🔸 <strong>${currentLang === 'fa' ? 'متضادها:' : 'Antonyms:'}</strong> ${card.antonyms || '-'}</p>
+                            <p style="margin: 8px 0;"><strong>${currentLang === 'fa' ? 'مثال:' : 'Example:'}</strong> ${card.example || '-'}</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
+                    <button onclick="navigateCard(-1, 'syn')" style="background: var(--border); padding: 10px 15px;" ${currentCardIndexSyn === 0 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>${t.btnPrev}</button>
+                    <button onclick="handleCardResponse('${card.id}', false, 'syn')" style="background: var(--danger); flex: 1;">${t.btnHard}</button>
+                    <button onclick="handleCardResponse('${card.id}', true, 'syn')" style="background: var(--accent); flex: 1;">${t.btnEasy}</button>
+                    <button onclick="navigateCard(1, 'syn')" style="background: var(--border); padding: 10px 15px;" ${currentCardIndexSyn >= synCards.length - 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>${t.btnNext}</button>
+                </div>
+            `;
+        }
+
+        // منطق بازی حدس کلمه (Word Scramble)
+        function initGameWord() {
+            const unitFilter = document.getElementById('game-filter-unit').value;
+            const filtered = allCards.filter(c => unitFilter ? (c.unit || 'عمومی') === unitFilter : true);
+            const container = document.getElementById('game-card-area');
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<p style="text-align:center; color: var(--border);">${currentLang === 'fa' ? 'کلمه‌ای برای بازی در این یونیت یافت نشد.' : 'No words found for game.'}</p>`;
+                return;
+            }
+
+            currentGameCard = filtered[Math.floor(Math.random() * filtered.length)];
+            const scrambled = scrambleWord(currentGameCard.word);
+
+            container.innerHTML = `
+                <div style="background: var(--bg-color); border: 1px solid var(--border); padding: 25px; border-radius: 12px; max-width: 500px; margin: 0 auto; text-align: center;">
+                    <span class="badge" style="margin-bottom: 10px;">${currentGameCard.unit || 'عمومی'}</span>
+                    <p style="font-size: 15px; opacity: 0.9; margin-bottom: 5px;">${currentLang === 'fa' ? 'معنی:' : 'Meaning:'} <strong>${currentGameCard.meaning}</strong></p>
+                    ${currentGameCard.pos ? `<div class="pos-badge" style="margin-bottom: 15px;">${currentGameCard.pos}</div>` : ''}
+                    
+                    <h3 style="font-size: 28px; letter-spacing: 5px; color: var(--primary); margin: 15px 0;">${scrambled}</h3>
+                    <p style="font-size: 13px; color: #94a3b8; margin-bottom: 15px;">${currentLang === 'fa' ? 'حروف را مرتب کنید و املا صحیح کلمه انگلیسی را بنویسید' : 'Unscramble the letters'}</p>
+                    
+                    <input type="text" id="game-user-input" placeholder="${currentLang === 'fa' ? 'کلمه انگلیسی...' : 'Type English word...'}" style="width: 100%; box-sizing: border-box; text-align: center; font-size: 16px; padding: 12px;" onkeydown="if(event.key==='Enter') checkGameAnswer()">
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button onclick="checkGameAnswer()" style="background: var(--accent); flex: 1; padding: 12px;">${currentLang === 'fa' ? 'بررسی پاسخ' : 'Check'}</button>
+                        <button onclick="revealGameAnswer()" style="background: var(--danger); flex: 1; padding: 12px;">${currentLang === 'fa' ? 'بلد نیستم (نمایش املا)' : "Don't know"}</button>
+                    </div>
+                    <div id="game-feedback" style="margin-top: 15px; font-weight: bold; font-size: 15px;"></div>
+                </div>
+            `;
+            setTimeout(() => {
+                const inputEl = document.getElementById('game-user-input');
+                if (inputEl) inputEl.focus();
+            }, 100);
+        }
+
+        function scrambleWord(word) {
+            if (!word) return '';
+            let arr = word.split('');
+            for (let i = arr.length - 1; i > 0; i--) {
+                let j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            let scrambled = arr.join('');
+            if (scrambled === word && word.length > 1) {
+                return scrambleWord(word);
+            }
+            return scrambled;
+        }
+
+        function checkGameAnswer() {
+            if (!currentGameCard) return;
+            const userAns = document.getElementById('game-user-input').value.trim().toLowerCase();
+            const correctAns = currentGameCard.word.trim().toLowerCase();
+            const feedback = document.getElementById('game-feedback');
+
+            if (userAns === correctAns) {
+                feedback.innerHTML = `<span style="color: var(--accent);">✅ ${currentLang === 'fa' ? 'آفرین! کاملاً درست است.' : 'Correct! Well done.'}</span>`;
+                setTimeout(() => { initGameWord(); }, 1500);
+            } else {
+                feedback.innerHTML = `<span style="color: var(--danger);">❌ ${currentLang === 'fa' ? 'اشتباه است!' : 'Incorrect!'} <br>${currentLang === 'fa' ? 'املا صحیح:' : 'Correct spelling:'} <b style="color: var(--text-color); font-size: 18px;">${currentGameCard.word}</b></span>`;
+            }
+        }
+
+        function revealGameAnswer() {
+            if (!currentGameCard) return;
+            const feedback = document.getElementById('game-feedback');
+            feedback.innerHTML = `<span style="color: var(--danger);">📌 ${currentLang === 'fa' ? 'املا صحیح کلمه:' : 'Correct spelling:'} <b style="color: var(--text-color); font-size: 18px;">${currentGameCard.word}</b></span>`;
+        }
+
+        function navigateCard(direction, mode) {
+            if (mode === 'en') {
+                const max = getFilteredCards().length;
+                currentCardIndexEn = Math.max(0, Math.min(currentCardIndexEn + direction, max - 1));
+                renderEnFlashcard();
+            } else if (mode === 'fa') {
+                const max = getFilteredCardsFa().length;
+                currentCardIndexFa = Math.max(0, Math.min(currentCardIndexFa + direction, max - 1));
+                renderFaFlashcard();
+            } else if (mode === 'syn') {
+                const max = getFilteredSynCards().length;
+                currentCardIndexSyn = Math.max(0, Math.min(currentCardIndexSyn + direction, max - 1));
+                renderSynonymsSection();
+            }
+        }
+
+        async function handleCardResponse(cardId, isCorrect, mode) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const card = allCards.find(c => String(c.id) === String(cardId));
+            if (!card) return;
+
+            let steps = [1, 2, 3, 4, 5, 6, 7, 15, 30];
+            let currentStepIdx = steps.indexOf(card.step);
+            if (currentStepIdx === -1) currentStepIdx = 0;
+
+            let nextStep = isCorrect ? steps[Math.min(currentStepIdx + 1, steps.length - 1)] : 1;
+            let nextDate = new Date();
+            nextDate.setDate(nextDate.getDate() + 1);
+
+            card.step = nextStep;
+            card.last_review_date = todayStr;
+            card.next_review = nextDate.toISOString().split('T')[0];
+            card.reviewed_today = true;
+
+            if (!card.review_history || !Array.isArray(card.review_history)) {
+                card.review_history = [null, null, null, null, null, null, null];
+            }
+            let emptyIndex = card.review_history.findIndex(item => item === null);
+            if (emptyIndex !== -1) {
+                card.review_history[emptyIndex] = isCorrect;
+            } else {
+                card.review_history.shift();
+                card.review_history.push(isCorrect);
+            }
+
+            await supabaseClient.from('leitner_cards').update({
+                step: card.step,
+                last_review_date: card.last_review_date,
+                next_review: card.next_review,
+                reviewed_today: card.reviewed_today,
+                review_history: card.review_history
+            }).eq('id', card.id);
+            
+            updateSmartReminder();
+
+            if (mode === 'en') {
+                currentCardIndexEn++;
+                renderEnFlashcard();
+            } else if (mode === 'fa') {
+                currentCardIndexFa++;
+                renderFaFlashcard();
+            } else if (mode === 'syn') {
+                currentCardIndexSyn++;
+                renderSynonymsSection();
+            }
+        }
+
+        async function addSingleWord() {
+            if (!currentUser) return;
+            const unit = document.getElementById('add-unit').value || 'عمومی';
+            const word = document.getElementById('add-word').value;
+            const pos = document.getElementById('add-pos').value;
+            const pronun = document.getElementById('add-pronun').value;
+            const meaning = document.getElementById('add-meaning').value;
+            const synonyms = document.getElementById('add-synonyms').value;
+            const antonyms = document.getElementById('add-antonyms').value;
+            const example = document.getElementById('add-example').value;
+
+            if (!word || !meaning) {
+                alert(currentLang === 'fa' ? 'وارد کردن کلمه و معنی الزامی است.' : 'Word and meaning are required.');
+                return;
+            }
+
+            const newCard = { 
+                unit, word, pos, pronun, meaning, synonyms, antonyms, example, 
+                step: 1, 
+                reviewed_today: false,
+                review_history: [null, null, null, null, null, null, null],
+                user_id: currentUser.id
+            };
+
+            const { error } = await supabaseClient.from('leitner_cards').insert([newCard]);
+            if (error) {
+                alert('خطا در ثبت کلمه: ' + error.message);
+                return;
+            }
+
+            alert(currentLang === 'fa' ? 'کلمه با موفقیت ثبت شد.' : 'Word saved successfully.');
+            document.getElementById('add-word').value = '';
+            document.getElementById('add-pronun').value = '';
+            document.getElementById('add-meaning').value = '';
+            document.getElementById('add-synonyms').value = '';
+            document.getElementById('add-antonyms').value = '';
+            document.getElementById('add-example').value = '';
+            loadCards();
+        }
+
+        function renderWordsList() {
+            const container = document.getElementById('words-list-container');
+            const t = translations[currentLang];
+            if (!allCards || allCards.length === 0) {
+                container.innerHTML = `<p>${currentLang === 'fa' ? 'کلمه‌ای ثبت نشده است.' : 'No words registered.'}</p>`;
+                return;
+            }
+
+            let html = '<table style="width:100%; border-collapse: collapse; font-size: 14px;">';
+            html += `<tr style="border-bottom: 1px solid var(--border);">
+                <th><input type="checkbox" id="master-check" onclick="toggleSelectAll(this)"></th>
+                <th>${currentLang === 'fa' ? 'شماره' : 'No.'}</th>
+                <th>${t.thWord}</th>
+                <th>${t.thPos}</th>
+                <th>${t.thMeaning}</th>
+                <th>${t.thStatus}</th>
+                <th>${t.thAction}</th>
+            </tr>`;
+            
+            const unitCounters = {};
+
+            allCards.forEach((c) => {
+                const unitName = c.unit || 'عمومی';
+                if (!unitCounters[unitName]) {
+                    unitCounters[unitName] = 1;
+                } else {
+                    unitCounters[unitName]++;
+                }
+                const unitIndex = unitCounters[unitName];
+
+                html += `<tr style="border-bottom: 1px solid var(--border); text-align: center;">
+                    <td><input type="checkbox" class="word-checkbox" value="${c.id}"></td>
+                    <td>${unitIndex}</td>
+                    <td><b>${c.word}</b></td>
+                    <td><span class="pos-badge">${c.pos || '-'}</span></td>
+                    <td>${c.meaning}</td>
+                    <td>${currentLang === 'fa' ? 'روز' : 'Day'} ${c.step || 1}</td>
+                    <td><button onclick="deleteCard('${c.id}')" style="background:var(--danger); padding:4px 8px; font-size:12px;">${t.deleteBtn}</button></td>
+                </tr>`;
+            });
+            html += '</table>';
+            container.innerHTML = html;
+        }
+
+        function toggleSelectAll(master) {
+            const checkboxes = document.querySelectorAll('.word-checkbox');
+            checkboxes.forEach(cb => cb.checked = master.checked);
+        }
+
+        async function deleteSelectedWords() {
+            const selectedCheckboxes = document.querySelectorAll('.word-checkbox:checked');
+            if (selectedCheckboxes.length === 0) {
+                alert(currentLang === 'fa' ? 'لطفاً حداقل یک کلمه را انتخاب کنید.' : 'Please select at least one word.');
+                return;
+            }
+
+            if (confirm(currentLang === 'fa' ? `آیا از حذف ${selectedCheckboxes.length} کلمه انتخاب‌شده اطمینان دارید؟` : `Are you sure to delete ${selectedCheckboxes.length} selected words?`)) {
+                const idsToDelete = Array.from(selectedCheckboxes).map(cb => cb.value);
+                
+                const { error } = await supabaseClient
+                    .from('leitner_cards')
+                    .delete()
+                    .in('id', idsToDelete);
+
+                if (error) {
+                    alert('خطا در حذف گروهی: ' + error.message);
+                } else {
+                    await loadCards();
+                    renderWordsList();
+                    alert(currentLang === 'fa' ? 'کلمات انتخاب‌شده با موفقیت حذف شدند.' : 'Selected words deleted successfully.');
+                }
+            }
+        }
+
+        async function deleteCard(id) {
+            if (confirm(currentLang === 'fa' ? 'آیا از حذف این کلمه اطمینان دارید؟' : 'Are you sure to delete this word?')) {
+                await supabaseClient.from('leitner_cards').delete().eq('id', id);
+                loadCards();
+                renderWordsList();
+            }
+        }
+
+        function initStatsView() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const total = allCards.length;
+            const ready = allCards.filter(c => !c.next_review || c.next_review <= todayStr).length;
+
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-ready').innerText = ready;
+
+            const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 15: 0, 30: 0 };
+            allCards.forEach(c => { if (counts[c.step] !== undefined) counts[c.step]++; });
+
+            document.getElementById('stat-step-1').innerText = counts[1];
+            document.getElementById('stat-step-2').innerText = counts[2];
+            document.getElementById('stat-step-3').innerText = counts[3];
+            document.getElementById('stat-step-4').innerText = counts[4];
+            document.getElementById('stat-step-5').innerText = counts[5];
+            document.getElementById('stat-step-6').innerText = counts[6];
+            document.getElementById('stat-step-7').innerText = counts[7];
+            document.getElementById('stat-step-15').innerText = counts[15];
+
+            updateFilterDropdowns();
+            renderChart(counts);
+            renderStatsTable();
+        }
+
+        function renderStatsTable() {
+            const tbody = document.getElementById('stats-table-body');
+            const unitFilter = document.getElementById('filter-unit').value;
+            const stepFilter = document.getElementById('filter-step').value;
+            const posFilter = document.getElementById('filter-pos').value;
+
+            let filtered = allCards.filter(c => {
+                let matchUnit = unitFilter ? (c.unit || 'عمومی') === unitFilter : true;
+                let matchStep = stepFilter ? String(c.step) === stepFilter : true;
+                let matchPos = posFilter ? (c.pos || 'Other (سایر)') === posFilter : true;
+                return matchUnit && matchStep && matchPos;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="padding: 15px; color: #94a3b8;">${currentLang === 'fa' ? 'کلمه‌ای یافت نشد.' : 'No words found.'}</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(c => {
+                const unitCardNo = getUnitCardNumber(c);
+                html += `
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 10px;">${c.unit || 'عمومی'}</td>
+                        <td><span class="badge">#${unitCardNo}</span></td>
+                        <td><b>${c.word}</b></td>
+                        <td><span class="pos-badge">${c.pos || '-'}</span></td>
+                        <td>${c.meaning}</td>
+                        <td><span class="badge">${currentLang === 'fa' ? 'روز' : 'Day'} ${c.step || 1}</span></td>
+                        <td>${c.last_review_date || '-'}</td>
+                        <td>${c.next_review || '-'}</td>
+                        <td>
+                            <button onclick="openEditModal('${c.id}')" style="background: var(--primary); padding: 4px 8px; font-size: 11px;">${translations[currentLang].editBtn}</button>
+                            <button onclick="deleteCard('${c.id}'); initStatsView();" style="background: var(--danger); padding: 4px 8px; font-size: 11px;">${translations[currentLang].deleteBtn}</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function openEditModal(id) {
+            const card = allCards.find(c => String(c.id) === String(id));
+            if (!card) return;
+
+            document.getElementById('edit-id').value = card.id;
+            document.getElementById('edit-unit-input').value = card.unit || '';
+            document.getElementById('edit-word-input').value = card.word || '';
+            document.getElementById('edit-pos-input').value = card.pos || 'Noun (اسم)';
+            document.getElementById('edit-pronun-input').value = card.pronun || '';
+            document.getElementById('edit-meaning-input').value = card.meaning || '';
+            document.getElementById('edit-synonyms-input').value = card.synonyms || '';
+            document.getElementById('edit-antonyms-input').value = card.antonyms || '';
+            document.getElementById('edit-example-input').value = card.example || '';
+
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); }
+
+        async function saveEditedWord() {
+            const id = document.getElementById('edit-id').value;
+            const updatedData = {
+                unit: document.getElementById('edit-unit-input').value,
+                word: document.getElementById('edit-word-input').value,
+                pos: document.getElementById('edit-pos-input').value,
+                pronun: document.getElementById('edit-pronun-input').value,
+                meaning: document.getElementById('edit-meaning-input').value,
+                synonyms: document.getElementById('edit-synonyms-input').value,
+                antonyms: document.getElementById('edit-antonyms-input').value,
+                example: document.getElementById('edit-example-input').value
+            };
+
+            const { error } = await supabaseClient.from('leitner_cards').update(updatedData).eq('id', id);
+            if (error) { alert('خطا در ویرایش: ' + error.message); return; }
+
+            closeEditModal();
+            loadCards();
+            alert(currentLang === 'fa' ? 'تغییرات با موفقیت ذخیره شد.' : 'Changes saved successfully.');
+        }
+
+        function renderChart(counts) {
+            const ctx = document.getElementById('progressChart').getContext('2d');
+            if (myChart) myChart.destroy();
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: currentLang === 'fa' ? ['روز ۱', 'روز ۲', 'روز ۳', 'روز ۴', 'روز ۵', 'روز ۶', 'روز ۷', 'روز ۱۵', 'روز ۳۰'] : ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7', 'Day 15', 'Day 30'],
+                    datasets: [{
+                        label: currentLang === 'fa' ? 'تعداد کلمات در هر مرحله' : 'Words per step',
+                        data: [counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7], counts[15], counts[30]],
+                        backgroundColor: '#6366f1'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function downloadTemplate() {
+            const ws = XLSX.utils.json_to_sheet([
+                { unit: "Unit 1", word: "Apple", pos: "Noun (اسم)", pronun: "/ˈæp.əl/", meaning: "سیب", synonyms: "fruit", antonyms: "", example: "I ate an apple." }
+            ]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Template");
+            XLSX.writeFile(wb, "Leitner_Template.xlsx");
+        }
+
+        function exportToExcel() {
+            if (allCards.length === 0) {
+                alert(currentLang === 'fa' ? 'کلمه‌ای برای خروجی گرفتن وجود ندارد.' : 'No words to export.');
+                return;
+            }
+            const dataToExport = allCards.map((c) => ({
+                Unit: c.unit, CardNo: getUnitCardNumber(c), Word: c.word, Pos: c.pos, Pronun: c.pronun, Meaning: c.meaning,
+                Synonyms: c.synonyms, Antonyms: c.antonyms, Example: c.example,
+                Step: c.step, LastReview: c.last_review_date || '', NextReview: c.next_review || ''
+            }));
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Leitner_Words");
+            XLSX.writeFile(wb, "Leitner_Report.xlsx");
+        }
+
+        async function uploadExcel() {
+            if (!currentUser) return;
+            const fileInput = document.getElementById('excel-file');
+            if (!fileInput.files.length) {
+                alert(currentLang === 'fa' ? 'لطفاً ابتدا یک فایل انتخاب کنید.' : 'Please select a file first.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+                const formattedRows = rows.map(r => ({
+                    unit: r.unit || r.Unit || 'عمومی',
+                    word: r.word || r.Word,
+                    pos: r.pos || r.Pos || 'Noun (اسم)',
+                    pronun: r.pronun || r.Pronun || '',
+                    meaning: r.meaning || r.Meaning,
+                    synonyms: r.synonyms || r.Synonyms || '',
+                    antonyms: r.antonyms || r.Antonyms || '',
+                    example: r.example || r.Example || '',
+                    step: 1,
+                    reviewed_today: false,
+                    review_history: [null, null, null, null, null, null, null],
+                    user_id: currentUser.id
+                }));
+
+                const { error } = await supabaseClient.from('leitner_cards').insert(formattedRows);
+                if (error) { alert('خطا در آپلود گروهی: ' + error.message); return; }
+
+                alert(currentLang === 'fa' ? 'کلمات با موفقیت بارگذاری شدند!' : 'Words uploaded successfully!');
+                loadCards();
+            };
+            reader.readAsArrayBuffer(fileInput.files[0]);
+        }
+
+        function toggleTheme() { document.body.classList.toggle('light-mode'); }
+    </script>
+</body>
+</html>
